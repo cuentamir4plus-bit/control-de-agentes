@@ -45,7 +45,7 @@
         <li data-section="history"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M12 6v6l3 2.5"/><path d="M21 3v6h-6"/></svg>Historial</li>
         <li data-section="models"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><path d="M2 14h20"/><path d="M12 14v4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>Modelos</li>
         <li data-section="skills"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3H12L9 9h5l-3 12"/><path d="M3 12h4l2-6"/><path d="M17 12h4l-2-6"/></svg>Skills</li>
-        <li data-section="mcps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="8" height="8" rx="1.5"/><rect x="14" y="2" width="8" height="8" rx="1.5"/><rect x="2" y="14" width="8" height="8" rx="1.5"/><rect x="14" y="14" width="8" height="8" rx="1.5"/></svg>MCPs</li>
+
         <li data-section="jira"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 12l10 10 10-10L12 2z"/><path d="M8 12l4-4 4 4"/></svg>Jira</li>
         <li data-section="config"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Config</li>
       </ul>
@@ -113,20 +113,23 @@
         </div>
       </section>
 
-      <!-- MCPs -->
-      <section id="section-mcps" class="hidden">
-        <div class="mcp-placeholder">
-          <div class="icon">🔌</div>
-          <p>Model Context Protocol — próximamente</p>
-          <p style="font-size:12px;margin-top:8px;color:var(--text-muted);">Los MCPs permiten conectar agentes a herramientas externas.</p>
-        </div>
-      </section>
-
       <!-- Jira -->
       <section id="section-jira" class="hidden">
-        <div class="page-header"><h2>Jira</h2></div>
+        <div class="page-header">
+          <h2>Jira</h2>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="search-wrap">
+              <input type="text" class="search-input" id="jira-search" placeholder="JQL: project = PROJ..." autocomplete="off">
+            </div>
+            <button class="btn btn-primary" id="new-jira-btn">+ Nuevo issue</button>
+          </div>
+        </div>
         <div id="jira-loading" class="spinner" style="display:none;"></div>
         <div id="jira-content"></div>
+        <div id="jira-empty" class="empty-state" style="display:none;">
+          <div class="icon">📋</div>
+          <p>No se encontraron issues.</p>
+        </div>
       </section>
 
       <!-- Configuración -->
@@ -223,6 +226,30 @@
       <div class="modal-actions">
         <button class="btn" id="skill-modal-cancel">Cancelar</button>
         <button class="btn btn-primary" id="skill-modal-save">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Jira modal ──────────────────────────────────── -->
+  <div id="jira-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Nuevo issue en Jira</h3>
+      <label>Proyecto (key)</label>
+      <input type="text" id="jira-project" placeholder="PROJ">
+      <label>Resumen</label>
+      <input type="text" id="jira-summary" placeholder="Título del issue">
+      <label>Descripción</label>
+      <textarea id="jira-description" placeholder="Descripción..." style="min-height:80px;"></textarea>
+      <label>Tipo</label>
+      <select id="jira-type">
+        <option value="Task">Task</option>
+        <option value="Bug">Bug</option>
+        <option value="Story">Story</option>
+        <option value="Epic">Epic</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn" id="jira-modal-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="jira-modal-save">Crear issue</button>
       </div>
     </div>
   </div>

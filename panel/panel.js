@@ -137,6 +137,7 @@ $$('.nav-list li').forEach((li) => {
     if (section === 'history') loadHistory();
     if (section === 'models') loadModels();
     if (section === 'skills') loadSkills();
+    if (section === 'jira') loadJira();
     if (section === 'config') updateConfigSection();
   });
 });
@@ -557,7 +558,7 @@ $('#file-input').addEventListener('change', () => {
 /* ── Models ──────────────────────────────────────────────────────────── */
 async function loadModels() {
   const grid = $('#models-grid'), loading = $('#models-loading'), errorEl = $('#models-error'), errorText = $('#models-error-text');
-  loading.style.display = 'block'; grid.innerHTML = ''; errorEl.style.display = 'none';
+  loading.style.display = 'none'; errorEl.style.display = 'none'; grid.innerHTML = '<div class="skeleton skeleton-card"></div>'.repeat(6);
   try {
     const data = await api('GET', '/api/models');
     STATE.models = data.models || [];
@@ -570,11 +571,11 @@ async function loadModels() {
         <div class="desc">${esc((m.description || '').substring(0, 140))}</div>
        </div>`
     ).join('');
-  } catch (err) { loading.style.display = 'none'; errorEl.style.display = 'block'; errorText.textContent = err.message; }
+  } catch (err) { grid.innerHTML = ''; loading.style.display = 'none'; errorEl.style.display = 'block'; errorText.textContent = err.message; }
 }
 
 /* ── History ──────────────────────────────────────────────────────────── */
-let _historyTimer = null;
+let _historyTimer = null, _jiraTimer = null;
 
 async function loadHistory() {
   const list = $('#history-list'), empty = $('#history-empty'), search = ($('#history-search') || { value: '' }).value.toLowerCase();
@@ -630,6 +631,77 @@ async function loadHistory() {
 $('#history-search')?.addEventListener('input', () => {
   clearTimeout(_historyTimer);
   _historyTimer = setTimeout(loadHistory, 250);
+});
+
+/* ── Jira ──────────────────────────────────────────────────────────── */
+$('#jira-search')?.addEventListener('input', () => {
+  clearTimeout(_jiraTimer);
+  _jiraTimer = setTimeout(loadJira, 250);
+});
+$('#jira-search')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_jiraTimer); loadJira(); }
+});
+
+async function loadJira() {
+  const content = $('#jira-content'), loading = $('#jira-loading'), empty = $('#jira-empty');
+  const jql = ($('#jira-search') || { value: '' }).value.trim();
+  content.innerHTML = '<div class="skeleton skeleton-card"></div>'.repeat(6);
+  loading.style.display = 'none'; empty.style.display = 'none';
+  try {
+    const params = jql ? '?jql=' + encodeURIComponent(jql) : '';
+    const data = await api('GET', '/api/jira/issues' + params);
+    const issues = data.issues || data || [];
+    if (issues.length === 0) { content.innerHTML = ''; empty.style.display = 'block'; return; }
+    renderJira(issues);
+  } catch (err) { renderJiraError(err.message); }
+}
+
+function renderJira(issues) {
+  const c = $('#jira-content');
+  c.innerHTML = issues.map((i) => {
+    const href = i.url || (i.self ? i.self.replace(/\/rest\/api\/\d+\/issue\/\d+/, '/browse/' + i.key) : '#');
+    const linkAttrs = href === '#' ? ' style="pointer-events:none;opacity:0.4;"' : '';
+    return '<div class="jira-card">' +
+      '<div class="jira-card-header">' +
+        '<span class="jira-key">' + esc(i.key) + '</span>' +
+        '<a href="' + esc(href) + '" target="_blank" class="jira-link"' + linkAttrs + '>Abrir ↗</a>' +
+      '</div>' +
+      '<div class="jira-summary">' + esc(i.summary) + '</div>' +
+      '<div class="jira-meta">' +
+        '<span class="jira-status">' + esc(i.status || '—') + '</span>' +
+        '<span class="jira-priority priority-' + esc((i.priority || 'medium').toLowerCase().replace(/[^a-z0-9]+/g, '-')) + '">' + esc(i.priority || '—') + '</span>' +
+        '<span class="jira-assignee">' + esc(i.assignee || 'Sin asignar') + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderJiraError(msg) {
+  $('#jira-content').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>' + esc(msg) + '</p></div>';
+}
+
+$('#new-jira-btn').addEventListener('click', () => {
+  $('#jira-project').value = ''; $('#jira-summary').value = '';
+  $('#jira-description').value = ''; $('#jira-type').value = 'Task';
+  $('#jira-modal').classList.remove('hidden');
+  setTimeout(() => $('#jira-project').focus(), 100);
+});
+
+$('#jira-modal-cancel').addEventListener('click', () => $('#jira-modal').classList.add('hidden'));
+$('#jira-modal').addEventListener('click', (e) => { if (e.target === $('#jira-modal')) $('#jira-modal').classList.add('hidden'); });
+
+$('#jira-modal-save').addEventListener('click', async () => {
+  const project = $('#jira-project').value.trim();
+  const summary = $('#jira-summary').value.trim();
+  const description = $('#jira-description').value.trim();
+  const issueType = $('#jira-type').value;
+  if (!project || !summary) return toast('Completá proyecto y resumen', 'warning');
+  try {
+    await api('POST', '/api/jira/issues', { project, summary, description, issueType });
+    $('#jira-modal').classList.add('hidden');
+    loadJira();
+    toast('Issue creado', 'success');
+  } catch (err) { toast(err.message, 'error'); }
 });
 
 /* ── Config ──────────────────────────────────────────────────────────── */
