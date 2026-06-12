@@ -40,6 +40,48 @@ function genSessionId() {
 function getLastModel(id) { try { return localStorage.getItem('last-model-' + id) || ''; } catch { return ''; } }
 function setLastModel(id, m) { try { localStorage.setItem('last-model-' + id, m); } catch {} }
 
+/* ── Theme toggle ─────────────────────────────────────────────────── */
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    $('#theme-toggle').textContent = '☀️';
+  }
+}
+
+$('#theme-toggle')?.addEventListener('click', () => {
+  const html = document.documentElement;
+  const isLight = html.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    html.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'dark');
+    $('#theme-toggle').textContent = '🌙';
+  } else {
+    html.setAttribute('data-theme', 'light');
+    localStorage.setItem('theme', 'light');
+    $('#theme-toggle').textContent = '☀️';
+  }
+});
+
+/* ── Status polling ──────────────────────────────────────────────── */
+async function pollStatus() {
+  try {
+    const data = await api('GET', '/api/status');
+    const mem = data.memory + ' MB';
+    const uptime = formatUptime(data.uptime);
+    $('#status-line').textContent = `${uptime} · ${mem} · ${data.agentsCount} agentes`;
+  } catch {
+    $('#status-line').textContent = 'Servidor desconectado';
+  }
+}
+
+function formatUptime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 /* ── Toast system ─────────────────────────────────────────────────── */
 function toast(msg, type = 'info', duration = 3500) {
   const c = $('#toast-container');
@@ -80,6 +122,15 @@ async function api(method, url, body) {
   return r.json();
 }
 
+/* ── Export session ──────────────────────────────────────────────── */
+function exportSession(agentId, sessionId) {
+  const url = `/api/chats/${agentId}/${sessionId}/export`;
+  const a = _d.createElement('a');
+  a.href = url;
+  a.download = `${agentId}-${sessionId}.md`;
+  a.click();
+}
+
 /* ── Init ─────────────────────────────────────────────────────────── */
 async function init() {
   try {
@@ -96,6 +147,9 @@ async function init() {
 function enterApp() {
   $('#wizard-overlay').classList.add('hidden');
   $('#app').classList.remove('hidden');
+  initTheme();
+  pollStatus();
+  setInterval(pollStatus, 30000);
   loadAgents();
   loadSkills();
   loadModels();
@@ -372,9 +426,17 @@ function renderSessionsBar(sessions) {
   sessions.forEach((s) => {
     const chip = _d.createElement('span');
     chip.className = 'session-chip' + (s.sessionId === STATE.currentSessionId ? ' active' : '');
-    chip.textContent = s.sessionId.replace(/^\d{4}-\d{2}-\d{2}T/, '').replace(/-/g, ':');
+    const label = s.sessionId.replace(/^\d{4}-\d{2}-\d{2}T/, '').replace(/-/g, ':');
+    chip.innerHTML = `${label} <button class="chip-export" title="Exportar sesión">⬇</button>`;
     chip.title = s.preview || s.sessionId;
-    chip.addEventListener('click', () => loadSession(STATE.currentAgentId, s.sessionId));
+    chip.querySelector('.chip-export')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportSession(STATE.currentAgentId, s.sessionId);
+    });
+    chip.addEventListener('click', (e) => {
+      if (e.target.closest('.chip-export')) return;
+      loadSession(STATE.currentAgentId, s.sessionId);
+    });
     bar.appendChild(chip);
   });
 }
@@ -603,6 +665,7 @@ async function loadHistory() {
           <span class="preview">${esc(s.preview || '(vacío)').substring(0, 140)}</span>
           <span class="actions">
             <button class="btn btn-sm load-session" data-agent="${agent.id}" data-session="${s.sessionId}">Abrir</button>
+            <button class="btn btn-sm export-session" data-agent="${agent.id}" data-session="${s.sessionId}">Exportar</button>
             <button class="btn btn-sm btn-danger delete-session" data-agent="${agent.id}" data-session="${s.sessionId}">Eliminar</button>
           </span>`;
         group.appendChild(item);
@@ -623,6 +686,11 @@ async function loadHistory() {
         if (await confirmDialog('¿Eliminar esta sesión de chat?', 'Eliminar sesión')) {
           try { await api('DELETE', '/api/chats/' + btn.dataset.agent + '/' + btn.dataset.session); loadHistory(); toast('Sesión eliminada', 'success'); } catch (err) { toast(err.message, 'error'); }
         }
+      });
+    });
+    list.querySelectorAll('.export-session').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        exportSession(btn.dataset.agent, btn.dataset.session);
       });
     });
   } catch { list.innerHTML = '<div class="empty-state"><p>Error al cargar historial</p></div>'; }

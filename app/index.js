@@ -12,6 +12,7 @@ import chatRoutes from './routes/chat.js';
 import modelsRoutes from './routes/models.js';
 import jiraRoutes from './routes/jira.js';
 import uploadRoutes from './routes/upload.js';
+import statusRoutes from './routes/status.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api', chatRoutes);
 app.use('/api', modelsRoutes);
 app.use('/api', jiraRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', statusRoutes);
 
 app.use('/api', apiNotFound);
 

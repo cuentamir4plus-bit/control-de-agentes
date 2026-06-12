@@ -1,0 +1,16 @@
+name: Deploy
+on:
+  push:
+    branches: [master]
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --production
+      - run: |
+          pkill -f "node server.js" 2>/dev/null || true
+          cd ${{ github.workspace }}
+          nohup node server.js > server.log 2>&1 &
+          sleep 3
+          curl -f http://localhost:3000/api/config

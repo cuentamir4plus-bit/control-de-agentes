@@ -14,6 +14,18 @@ router.get('/chats/:agentId/:sessionId', async (req, res) => {
   res.json(session);
 });
 
+router.get('/chats/:agentId/:sessionId/export', async (req, res) => {
+  const format = req.query.format || 'md';
+  if (format !== 'md') {
+    return res.status(400).json({ error: 'Formato no soportado. Solo md disponible.' });
+  }
+  const session = await store.getSession(req.params.agentId, req.params.sessionId);
+  const fileName = `${req.params.agentId}-${req.params.sessionId}.md`;
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(session.content);
+});
+
 router.delete('/chats/:agentId/:sessionId', async (req, res) => {
   const result = await store.deleteSession(req.params.agentId, req.params.sessionId);
   res.json(result);
