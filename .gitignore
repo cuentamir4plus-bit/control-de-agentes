@@ -1,0 +1,8 @@
+node_modules/
+.env
+agents/*.json
+chats/
+outputs/
+uploads/
+build/
+*.exe
